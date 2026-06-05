@@ -1,0 +1,4 @@
+# Run the HomeLine worker every minute. Output to container logs.
+* * * * * www-data php /var/www/html/cron/worker.php >> /proc/1/fd/1 2>&1
+# Blank line required by cron below:
+

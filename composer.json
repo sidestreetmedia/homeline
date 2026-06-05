@@ -1,0 +1,14 @@
+{
+    "name": "sidestreet/homeline",
+    "description": "Multi-tenant audio-listing platform for real estate agents.",
+    "type": "project",
+    "require": {
+        "php": ">=8.2",
+        "stripe/stripe-php": "^15.0",
+        "twilio/sdk": "^8.0",
+        "aws/aws-sdk-php": "^3.300"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

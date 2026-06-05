@@ -1,0 +1,42 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      # --- Infrastructure (environment ONLY — required to boot) ---
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: homeline
+      DB_USER: homeline
+      DB_PASS: ${DB_PASS:-changeme}
+      AUTO_MIGRATE: "1"
+      SEED_GOD: "1"
+      # Master key for encrypting stored API keys at rest (AES-256-GCM).
+      # Generate with: openssl rand -base64 32   (or php cron/gen_key.php)
+      # If unset, config values are stored as plaintext (a warning is shown).
+      CONFIG_ENCRYPTION_KEY: ${CONFIG_ENCRYPTION_KEY:-}
+      # --- Application keys (Twilio / ElevenLabs / Stripe / AWS / APP_BASE_URL) ---
+      # These are managed in the God-mode portal (App keys & config) and stored in
+      # the database. Configure them there after first sign-in. They are NOT set
+      # here. (For an automated first boot you may optionally export them in the
+      # environment as a one-time seed, but the portal is the source of truth.)
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: homeline
+      MYSQL_USER: homeline
+      MYSQL_PASSWORD: ${DB_PASS:-changeme}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS:-rootchangeme}
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+
+volumes:
+  db_data:

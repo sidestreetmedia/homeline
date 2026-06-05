@@ -1,0 +1,8 @@
+# Pretty-ish routing + security
+Options -Indexes
+DirectoryIndex index.php
+
+# Block direct access to dotfiles
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
