@@ -224,9 +224,69 @@ fixed by the `Dockerfile`.
 
 ---
 
+## Publishing to GitHub
+
+The repo includes a `.gitignore` that keeps secrets (`.env`,
+`INITIAL_GOD_PASSWORD.txt`) and `vendor/` out of version control. Note that
+`sql/seed_god.sql` contains only a **one-way bcrypt hash** of the initial
+password, which is safe to commit; the plaintext lives only in the ignored
+`INITIAL_GOD_PASSWORD.txt`.
+
+To create the repo and push (run locally, so your token stays on your machine):
+
+```bash
+cd homeline
+git init -b main
+git add .
+git commit -m "Initial commit: HomeLine"
+
+# Option A — GitHub CLI (prompts for auth):
+gh repo create homeline --private --source=. --remote=origin --push
+
+# Option B — create an empty repo in the web UI first, then:
+git remote add origin https://github.com/<owner>/homeline.git
+git push -u origin main
+```
+
+Once pushed, update the `REPO_URL` default in `scripts/install.sh` (or pass
+`HOMELINE_REPO=`) so the one-command installer points at your repo.
+
+---
+
 ## Install & run (Docker — recommended)
 
-### 0. Prepare a fresh Ubuntu 24.04 host
+### One-command install (fresh Ubuntu server)
+
+On a brand-new Ubuntu 24.04 box, this installs Docker, fetches the project,
+generates secrets, and starts everything:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/<owner>/homeline/main/scripts/install.sh | sudo bash
+```
+
+(Replace `<owner>` with your GitHub org/user once the repo is pushed.) The script
+is **idempotent** — re-running it updates the code and preserves your generated
+`CONFIG_ENCRYPTION_KEY` and database password, so you won't orphan encrypted
+config. It installs to `/opt/homeline`, writes a locked-down `.env`, brings the
+stack up, waits for health, then prints the URL and the God-mode login.
+
+Environment overrides (optional):
+
+```bash
+HOMELINE_REPO=https://github.com/<owner>/homeline.git \
+HOMELINE_BRANCH=main \
+HOMELINE_DIR=/opt/homeline \
+HOMELINE_PORT=8080 \
+  sudo -E bash -c "$(curl -fsSL https://raw.githubusercontent.com/<owner>/homeline/main/scripts/install.sh)"
+```
+
+After it finishes, put the app behind HTTPS and enter your API keys in the
+God-mode portal (see below). The manual steps follow if you'd rather do it
+yourself.
+
+### Manual install
+
+#### 0. Prepare a fresh Ubuntu 24.04 host
 
 Install Docker Engine + the Compose plugin from Docker's official repository
 (Ubuntu's built-in `docker.io` package also works but is older):
