@@ -1,0 +1,51 @@
+name: Publish direct installer
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: homeline-direct-installer
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Build and publish installer
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Build and verify package
+        run: |
+          bash scripts/build-installzip.sh
+          unzip -tq _zips/installzip.zip
+          cp _zips/installzip.zip homeline-install.zip
+          sha256sum homeline-install.zip > homeline-install.zip.sha256
+
+      - name: Publish stable GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view installer-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload installer-latest \
+              homeline-install.zip \
+              homeline-install.zip.sha256 \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create installer-latest \
+              homeline-install.zip \
+              homeline-install.zip.sha256 \
+              --target "$GITHUB_SHA" \
+              --title "HomeLine direct installer" \
+              --notes "Automatically rebuilt from the latest main branch. Run the install command from the README; the bootstrap script verifies this package against the published SHA-256 checksum." \
+              --latest=false \
+              --repo "$GITHUB_REPOSITORY"
+          fi

@@ -9,6 +9,29 @@ as a Docker container for easy deployment on a dedicated server.
 
 ---
 
+## Install directly from GitHub
+
+On a fresh Ubuntu 24.04 server, run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/install-from-zip.sh | sudo bash
+```
+
+No Git checkout is required. The bootstrap script installs Docker when needed,
+downloads the stable `installer-latest` package from GitHub Releases, verifies
+its SHA-256 checksum, generates the local secrets, and starts HomeLine. Every
+push to `main` automatically rebuilds and republishes that release package.
+
+Optional overrides can be passed through the environment:
+
+```bash
+HOMELINE_DIR=/opt/homeline \
+HOMELINE_PORT=8080 \
+  sudo -E bash -c "$(curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/install-from-zip.sh)"
+```
+
+---
+
 ## What it does
 
 - **Agent sign-up** with email/password accounts (multi-tenant — each agent only
@@ -250,24 +273,25 @@ git remote add origin https://github.com/<owner>/homeline.git
 git push -u origin main
 ```
 
-Once pushed, update the `REPO_URL` default in `scripts/install.sh` (or pass
-`HOMELINE_REPO=`) so the one-command installer points at your repo.
+The checked-in installer defaults target
+`https://github.com/sidestreetmedia/homeline`; pass `HOMELINE_REPO=` only when
+installing from a fork.
 
 ---
 
 ## Install & run (Docker — recommended)
 
-### One-command install (fresh Ubuntu server)
+### Git-backed install (fresh Ubuntu server)
 
 On a brand-new Ubuntu 24.04 box, this installs Docker, fetches the project,
 generates secrets, and starts everything:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<owner>/homeline/main/scripts/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/scripts/install.sh | sudo bash
 ```
 
-(Replace `<owner>` with your GitHub org/user once the repo is pushed.) The script
-is **idempotent** — re-running it updates the code and preserves your generated
+This alternative keeps a Git checkout on the server. The script is
+**idempotent** — re-running it updates the code and preserves your generated
 `CONFIG_ENCRYPTION_KEY` and database password, so you won't orphan encrypted
 config. It installs to `/opt/homeline`, writes a locked-down `.env`, brings the
 stack up, waits for health, then prints the URL and the God-mode login.
@@ -275,11 +299,11 @@ stack up, waits for health, then prints the URL and the God-mode login.
 Environment overrides (optional):
 
 ```bash
-HOMELINE_REPO=https://github.com/<owner>/homeline.git \
+HOMELINE_REPO=https://github.com/sidestreetmedia/homeline.git \
 HOMELINE_BRANCH=main \
 HOMELINE_DIR=/opt/homeline \
 HOMELINE_PORT=8080 \
-  sudo -E bash -c "$(curl -fsSL https://raw.githubusercontent.com/<owner>/homeline/main/scripts/install.sh)"
+  sudo -E bash -c "$(curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/scripts/install.sh)"
 ```
 
 After it finishes, put the app behind HTTPS and enter your API keys in the

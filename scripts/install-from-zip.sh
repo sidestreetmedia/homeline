@@ -2,20 +2,23 @@
 #
 # HomeLine — install from a packaged zip on GitHub (no git clone required).
 #
-# Pulls _zips/installzip.zip from the repo, unpacks it, generates secrets, and
-# brings the Docker stack up on a fresh Ubuntu host.
+# Pulls the stable installer release from GitHub, verifies its checksum,
+# unpacks it, generates secrets, and brings the Docker stack up on a fresh
+# Ubuntu host.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/scripts/install-from-zip.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/install-from-zip.sh | sudo bash
 #
-# Private repo? Pass a token with read access:
-#   GITHUB_TOKEN=ghp_xxx sudo -E bash install-from-zip.sh
+# Token-authenticated custom URL? Pass the token through the environment:
+#   GITHUB_TOKEN=github_pat_xxx sudo -E bash install-from-zip.sh
 #
 set -euo pipefail
 
 # ---- Config (override via environment) -------------------------------------
-# NOTE: this is the RAW download URL, not the github.com/.../blob/... HTML page.
-ZIP_URL="${HOMELINE_ZIP_URL:-https://raw.githubusercontent.com/sidestreetmedia/homeline/main/_zips/installzip.zip}"
+# NOTE: this is a direct download URL, not a github.com/.../blob/... HTML page.
+ZIP_URL="${HOMELINE_ZIP_URL:-https://github.com/sidestreetmedia/homeline/releases/download/installer-latest/homeline-install.zip}"
+CHECKSUM_URL="${HOMELINE_CHECKSUM_URL:-${ZIP_URL}.sha256}"
+SKIP_CHECKSUM="${HOMELINE_SKIP_CHECKSUM:-0}"
 INSTALL_DIR="${HOMELINE_DIR:-/opt/homeline}"
 HTTP_PORT="${HOMELINE_PORT:-8080}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
@@ -66,12 +69,13 @@ fi
 
 # ---- 3. Download the zip ----------------------------------------------------
 TMP_ZIP="$(mktemp --suffix=.zip)"
-trap 'rm -f "$TMP_ZIP"' EXIT
+TMP_CHECKSUM="$(mktemp)"
+trap 'rm -f "$TMP_ZIP" "$TMP_CHECKSUM"' EXIT
 
 log "Downloading package from: $ZIP_URL"
 AUTH_ARGS=()
 if [ -n "$GITHUB_TOKEN" ]; then
-  # Works for raw.githubusercontent.com private files.
+  # Used for token-authenticated custom package URLs.
   AUTH_ARGS=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
 fi
 
@@ -90,6 +94,26 @@ fi
 if ! unzip -tq "$TMP_ZIP" >/dev/null 2>&1; then
   die "Downloaded zip failed integrity check."
 fi
+
+if [ "$SKIP_CHECKSUM" = "1" ]; then
+  warn "Skipping SHA-256 verification because HOMELINE_SKIP_CHECKSUM=1."
+else
+  log "Downloading checksum from: $CHECKSUM_URL"
+  CHECKSUM_HTTP_CODE="$(curl -fL -sS -w '%{http_code}' "${AUTH_ARGS[@]}" \
+    -o "$TMP_CHECKSUM" "$CHECKSUM_URL" || true)"
+  if [ "$CHECKSUM_HTTP_CODE" != "200" ]; then
+    die "Checksum download failed (HTTP ${CHECKSUM_HTTP_CODE:-?}). Set HOMELINE_SKIP_CHECKSUM=1 only if you trust a custom package URL."
+  fi
+
+  EXPECTED_SHA="$(awk 'NR == 1 { print $1 }' "$TMP_CHECKSUM")"
+  case "$EXPECTED_SHA" in
+    ''|*[!0-9a-fA-F]*) die "Published checksum is malformed." ;;
+  esac
+  [ "${#EXPECTED_SHA}" -eq 64 ] || die "Published checksum is malformed."
+
+  ACTUAL_SHA="$(sha256sum "$TMP_ZIP" | awk '{ print $1 }')"
+  [ "${ACTUAL_SHA,,}" = "${EXPECTED_SHA,,}" ] || die "Package checksum mismatch; refusing to install."
+fi
 log "Package downloaded and verified."
 
 # ---- 4. Unpack --------------------------------------------------------------
@@ -97,7 +121,7 @@ mkdir -p "$INSTALL_DIR"
 log "Unpacking into $INSTALL_DIR..."
 # Stage to a temp dir so we can handle zips that contain a top-level folder.
 STAGE="$(mktemp -d)"
-trap 'rm -f "$TMP_ZIP"; rm -rf "$STAGE"' EXIT
+trap 'rm -f "$TMP_ZIP" "$TMP_CHECKSUM"; rm -rf "$STAGE"' EXIT
 unzip -q -o "$TMP_ZIP" -d "$STAGE"
 
 # If the zip has a single top-level directory, descend into it.

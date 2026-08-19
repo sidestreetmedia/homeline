@@ -26,4 +26,4 @@ zip -rq "$OUT" . \
   -x '*.log'
 
 echo "Built $OUT ($(du -h "$OUT" | cut -f1))"
-echo "Now: git add $OUT && git commit -m 'Update install package' && git push"
+echo "GitHub Actions publishes this package as the installer-latest release asset."
