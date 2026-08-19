@@ -33,13 +33,12 @@ set_exception_handler(function (Throwable $e): void {
         $isHtml = ($ct === '' || str_contains($ct, 'text/html'));
         if ($isHtml && PHP_SAPI !== 'cli') {
             http_response_code(503);
-            $key = htmlspecialchars($e->configKey, ENT_QUOTES, 'UTF-8');
             echo "<!doctype html><meta charset='utf-8'><title>Not configured</title>"
                . "<div style='font-family:system-ui;max-width:560px;margin:80px auto;padding:24px;"
                . "background:#111;color:#eee;border-radius:16px;line-height:1.5'>"
                . "<h2 style='margin-top:0'>This feature isn't configured yet</h2>"
-               . "<p>The setting <code>{$key}</code> hasn't been set. An administrator can add it "
-               . "in the God-mode portal under <strong>App keys &amp; config</strong>.</p></div>";
+               . "<p>An administrator can complete the private connection settings "
+               . "in God Mode under <strong>App keys &amp; config</strong>.</p></div>";
             exit;
         }
     }

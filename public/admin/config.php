@@ -28,13 +28,23 @@ $groups = [
         'AWS_REGION'            => 'Region (e.g. us-east-1)',
         'S3_BUCKET'             => 'Bucket name',
     ],
+    'AWS SES notifications' => [
+        'AWS_SES_ACCESS_KEY_ID'     => 'Access key ID',
+        'AWS_SES_SECRET_ACCESS_KEY' => 'Secret access key',
+        'AWS_SES_SESSION_TOKEN'     => 'Session token (optional)',
+        'AWS_SES_REGION'            => 'Region (e.g. us-east-1)',
+        'AWS_SES_FROM_EMAIL'        => 'Verified sender email',
+        'AWS_SES_FROM_NAME'         => 'Sender name (default HomeLine)',
+        'AWS_SES_REPLY_TO_EMAIL'    => 'Reply-to email (optional)',
+        'AWS_SES_CONFIGURATION_SET' => 'Configuration set (optional)',
+    ],
     'Application' => [
         'APP_BASE_URL'          => 'Public base URL (https://…)',
-        'DISABLE_SSL'           => 'Disable Secure cookies behind TLS proxy (0/1)',
+        'DISABLE_SSL'           => 'Allow cookies over plain HTTP (0/1; use 0 for HTTPS)',
     ],
 ];
 
-$isSecret = fn(string $k): bool => (bool) preg_match('/(KEY|TOKEN|SECRET)$/', $k);
+$isSecret = fn(string $k): bool => (bool) preg_match('/(ACCESS_KEY_ID|KEY|TOKEN|SECRET)$/', $k);
 $MASK = '••••••••';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

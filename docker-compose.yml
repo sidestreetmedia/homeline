@@ -2,8 +2,8 @@ services:
   app:
     build: .
     restart: unless-stopped
-    ports:
-      - "8080:80"
+    expose:
+      - "80"
     environment:
       # --- Infrastructure (environment ONLY — required to boot) ---
       DB_HOST: db
@@ -17,13 +17,31 @@ services:
       # Generate with: openssl rand -base64 32   (or php cron/gen_key.php)
       # If unset, config values are stored as plaintext (a warning is shown).
       CONFIG_ENCRYPTION_KEY: ${CONFIG_ENCRYPTION_KEY:-}
-      # --- Application keys (Telnyx / ElevenLabs / Stripe / AWS / APP_BASE_URL) ---
-      # These are managed in the God-mode portal (App keys & config) and stored in
+      APP_BASE_URL: ${APP_BASE_URL:-}
+      DISABLE_SSL: ${DISABLE_SSL:-}
+      # --- Application keys and public URL ---
+      # These are managed in the God Mode portal (App keys & config) and stored in
       # the database. Configure them there after first sign-in. They are NOT set
       # here. (For an automated first boot you may optionally export them in the
       # environment as a one-time seed, but the portal is the source of truth.)
     depends_on:
       - db
+
+  caddy:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      HOMELINE_SITE_ADDRESS: ${HOMELINE_SITE_ADDRESS:-:80}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
 
   db:
     image: mysql:8.0
@@ -35,8 +53,8 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS:-rootchangeme}
     volumes:
       - db_data:/var/lib/mysql
-    ports:
-      - "3307:3306"
 
 volumes:
   db_data:
+  caddy_data:
+  caddy_config:

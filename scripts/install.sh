@@ -22,13 +22,19 @@ set -euo pipefail
 REPO_URL="${HOMELINE_REPO:-https://github.com/sidestreetmedia/homeline.git}"
 BRANCH="${HOMELINE_BRANCH:-main}"
 INSTALL_DIR="${HOMELINE_DIR:-/opt/homeline}"
-HTTP_PORT="${HOMELINE_PORT:-8080}"
+DOMAIN_OVERRIDE="${HOMELINE_DOMAIN:-}"
+SITE_ADDRESS_OVERRIDE="${HOMELINE_SITE_ADDRESS:-$DOMAIN_OVERRIDE}"
 
 log()  { printf '\033[1;36m[homeline]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[homeline]\033[0m %s\n' "$*"; }
 die()  { printf '\033[1;31m[homeline]\033[0m %s\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || die "Please run as root (use sudo)."
+
+if [ -n "$SITE_ADDRESS_OVERRIDE" ] && [ "$SITE_ADDRESS_OVERRIDE" != ":80" ]; then
+  [[ "$SITE_ADDRESS_OVERRIDE" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] \
+    || die "HOMELINE_DOMAIN must be a bare hostname such as home.example.com (no scheme, port, or path)."
+fi
 
 # ---- 1. OS check -----------------------------------------------------------
 if [ -r /etc/os-release ]; then . /etc/os-release; fi
@@ -103,6 +109,15 @@ get_or_set() {  # name  generator-cmd
   fi
 }
 
+set_env() {  # name value -> replace or append one deployment setting
+  local name="$1" value="$2"
+  if grep -qE "^${name}=" "$ENV_FILE"; then
+    sed -i "s|^${name}=.*|${name}=${value}|" "$ENV_FILE"
+  else
+    printf '%s=%s\n' "$name" "$value" >> "$ENV_FILE"
+  fi
+}
+
 log "Preparing environment file ($ENV_FILE)..."
 get_or_set DB_PASS 'openssl rand -hex 24' >/dev/null
 get_or_set DB_ROOT_PASS 'openssl rand -hex 24' >/dev/null
@@ -110,22 +125,47 @@ get_or_set CONFIG_ENCRYPTION_KEY 'openssl rand -base64 32' >/dev/null
 # First-boot flags (only added if not present).
 grep -qE '^AUTO_MIGRATE=' "$ENV_FILE" || echo 'AUTO_MIGRATE=1' >> "$ENV_FILE"
 grep -qE '^SEED_GOD='     "$ENV_FILE" || echo 'SEED_GOD=1'     >> "$ENV_FILE"
-log "Existing MySQL volume and God-mode API keys will be reused."
+if [ -n "$SITE_ADDRESS_OVERRIDE" ]; then
+  set_env HOMELINE_SITE_ADDRESS "$SITE_ADDRESS_OVERRIDE"
+elif ! grep -qE '^HOMELINE_SITE_ADDRESS=.+$' "$ENV_FILE"; then
+  set_env HOMELINE_SITE_ADDRESS ':80'
+fi
+SITE_ADDRESS="$(grep -E '^HOMELINE_SITE_ADDRESS=' "$ENV_FILE" | tail -n1 | cut -d= -f2-)"
+if [ "$SITE_ADDRESS" != ":80" ] && ! grep -qE '^APP_BASE_URL=.+$' "$ENV_FILE"; then
+  set_env APP_BASE_URL "https://${SITE_ADDRESS}"
+fi
+if [ "$SITE_ADDRESS" = ":80" ]; then
+  grep -qE '^DISABLE_SSL=.+$' "$ENV_FILE" || set_env DISABLE_SSL '1'
+elif [ -n "$SITE_ADDRESS_OVERRIDE" ]; then
+  set_env DISABLE_SSL '0'
+else
+  grep -qE '^DISABLE_SSL=.+$' "$ENV_FILE" || set_env DISABLE_SSL '0'
+fi
+log "Existing database volume, credentials, and saved application settings will be reused."
 
 # ---- 5. Build & start ------------------------------------------------------
 log "Building and starting containers (this can take a few minutes the first time)..."
 $COMPOSE --env-file "$ENV_FILE" up -d --build
 
 # ---- 6. Wait for health ----------------------------------------------------
-log "Waiting for the app to respond on port ${HTTP_PORT}..."
+log "Waiting for the app to respond..."
 ok=0
 for _ in $(seq 1 60); do
-  code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${HTTP_PORT}/" || true)"
-  if [ "$code" = "200" ] || [ "$code" = "302" ]; then ok=1; break; fi
+  if $COMPOSE exec -T app php -r \
+    'exit(@file_get_contents("http://127.0.0.1/") === false ? 1 : 0);' >/dev/null 2>&1; then
+    ok=1; break
+  fi
   sleep 3
 done
 
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+if [ "$SITE_ADDRESS" = ":80" ]; then
+  PUBLIC_URL="http://${IP:-<server-ip>}/"
+  TLS_NOTE="Add a DNS hostname later and rerun with HOMELINE_DOMAIN to enable HTTPS."
+else
+  PUBLIC_URL="https://${SITE_ADDRESS}/"
+  TLS_NOTE="DNS must point to this server, with inbound TCP 80 and TCP 443 open."
+fi
 echo
 if [ "$ok" = "1" ]; then
   log "HomeLine is up."
@@ -136,18 +176,16 @@ cat <<MSG
 
   ──────────────────────────────────────────────────────────────
    HomeLine installed in: $INSTALL_DIR
-   Local URL:    http://127.0.0.1:${HTTP_PORT}/
-   LAN URL:      http://${IP:-<server-ip>}:${HTTP_PORT}/
+   Public URL:   $PUBLIC_URL
+   God Mode:     ${PUBLIC_URL%/}/admin/
 
    God-mode login:  joshuakuhn
    Temp password:   see $INSTALL_DIR/INITIAL_GOD_PASSWORD.txt (if present)
                     or reset:  $COMPOSE exec app php cron/make_god.php joshuakuhn --name="Joshua Kuhn"
 
-   NEXT STEPS
-     1. Put this behind HTTPS (reverse proxy or Cloudflare Tunnel) and
-        set APP_BASE_URL in God-mode → App keys & config.
-     2. Enter your Telnyx / ElevenLabs / Stripe / AWS keys in the portal.
-        (They're stored encrypted with the key in $ENV_FILE — back that up.)
+   $TLS_NOTE
+   Complete phone, narration, billing, and storage settings in
+   God Mode -> App keys & config. Back up $ENV_FILE.
 
    Manage:   cd $INSTALL_DIR && $COMPOSE ps | logs -f | down
   ──────────────────────────────────────────────────────────────

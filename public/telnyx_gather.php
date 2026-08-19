@@ -22,6 +22,14 @@ if ($listing && $digits === '1' && $from !== '') {
         DB::run("INSERT INTO call_events (listing_id, phone_number, caller_number, event_type)
                  VALUES (:l,:n,:c,'press1_sms')",
             [':l'=>$listing['id'], ':n'=>$to, ':c'=>$from]);
+        try {
+            $agent = DB::one("SELECT * FROM agents WHERE id=:id", [':id' => $listing['agent_id']]);
+            if ($agent) {
+                Notifications::callerRequested($agent, $listing, $from);
+            }
+        } catch (Throwable $e) {
+            error_log('Caller-request notification queue failed: ' . $e->getMessage());
+        }
         $xml->addChild('Say', 'Sent. Check your text messages. Goodbye.');
     } catch (Throwable $e) {
         error_log('press1 sms failed: ' . $e->getMessage());

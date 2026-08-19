@@ -33,7 +33,7 @@ ob_start();
     </div>
     <?php if (!empty($_GET['ok'])): ?><div class="flash ok"><?= e($_GET['ok']) ?></div><?php endif; ?>
     <div class="table-wrap"><table class="tbl">
-        <thead><tr><th>Agent</th><th>Email</th><th>Homes</th><th>Status</th><th>Stripe</th><th></th></tr></thead>
+        <thead><tr><th>Agent</th><th>Email</th><th>Homes</th><th>Status</th><th>Billing ID</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($agents as $a): ?>
             <tr>
@@ -48,6 +48,7 @@ ob_start();
                 </td>
                 <td class="muted" style="font-size:12px"><?= e($a['stripe_customer_id'] ?: '—') ?></td>
                 <td style="text-align:right">
+                    <a class="btn btn-sm" href="/admin/reset_password.php?agent_id=<?= (int)$a['id'] ?>">Reset password</a>
                     <?php if (!$a['is_god']): ?>
                     <form method="post" action="/admin/agent_action.php" style="display:inline">
                         <input type="hidden" name="csrf" value="<?= e(Auth::csrfToken()) ?>">

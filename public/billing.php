@@ -64,7 +64,7 @@ ob_start();
                 Add a card
             </button>
         </form>
-        <p class="muted" style="margin-top:12px;text-align:center">You're securely redirected to Stripe to enter your card. We never see the number.</p>
+        <p class="muted" style="margin-top:12px;text-align:center">You're securely redirected to our payment processor to enter your card. We never see the number.</p>
     <?php endif; ?>
 </div>
 <?php

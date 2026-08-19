@@ -145,7 +145,7 @@ try {
     // Best-effort cleanup: release a number if it was bought before failure.
     if ($purchased) { try { Telephony::release($numberId, $purchased); } catch (Throwable $x) {} }
     error_log('Listing create failed: ' . $e->getMessage());
-    $errBack('Could not complete: ' . $e->getMessage());
+    $errBack('We could not publish this home. Please try again or contact support.');
 }
 
 // Bump subscription quantity to match the new active count (next-cycle billing).
@@ -154,6 +154,15 @@ try { Billing::syncQuantity($me); } catch (Throwable $e) { error_log('syncQuanti
 // Generate + cache the narration if using TTS.
 if ($audioSource === 'tts') {
     enqueue('generate_tts', ['listing_id' => $newId]);
+}
+
+try {
+    $publishedListing = DB::one("SELECT * FROM listings WHERE id=:id", [':id' => $newId]);
+    if ($publishedListing) {
+        Notifications::homeAdded($me, $publishedListing);
+    }
+} catch (Throwable $e) {
+    error_log('Home-added notification queue failed: ' . $e->getMessage());
 }
 
 header('Location: /dashboard.php?ok=' . rawurlencode('Home published. Number ' . $purchased . ' is live.'));

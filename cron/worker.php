@@ -107,6 +107,16 @@ function handle_job(string $type, array $p): void
             Telephony::sendSms($to, $from, $body);
             break;
 
+        case 'send_email':
+            $to = (string) ($p['to'] ?? '');
+            $subject = (string) ($p['subject'] ?? '');
+            $body = (string) ($p['body'] ?? '');
+            if ($to === '' || $subject === '' || $body === '') {
+                throw new RuntimeException('Incomplete send_email job payload.');
+            }
+            Mailer::send($to, $subject, $body);
+            break;
+
         default:
             throw new RuntimeException("Unknown job type: {$type}");
     }

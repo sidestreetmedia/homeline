@@ -38,6 +38,10 @@ final class Config
         'AWS_SECRET_ACCESS_KEY',
         'AWS_REGION',
         'S3_BUCKET',
+        'AWS_SES_ACCESS_KEY_ID',
+        'AWS_SES_SECRET_ACCESS_KEY',
+        'AWS_SES_REGION',
+        'AWS_SES_FROM_EMAIL',
     ];
 
     /** Infrastructure keys that come from the environment ONLY (never the DB). */

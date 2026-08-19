@@ -23,7 +23,16 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Build application image
-        run: docker build --pull --tag homeline:test .
+        run: |
+          docker compose config >/dev/null
+          docker run --rm \
+            --env HOMELINE_SITE_ADDRESS=homeline.example.com \
+            --volume "$PWD/docker/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.11.4-alpine \
+            caddy validate --config /etc/caddy/Caddyfile
+          docker build --pull --tag homeline:test .
+          docker run --rm --entrypoint sh homeline:test -c \
+            'find /var/www/html -path /var/www/html/vendor -prune -o -name "*.php" -print0 | xargs -0 -n1 php -l'
 
       - name: Build and verify package
         run: |

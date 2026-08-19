@@ -8,6 +8,9 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/install-from-zip.sh | sudo bash
+# With automatic HTTPS:
+#   curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/install-from-zip.sh \
+#     | sudo env HOMELINE_DOMAIN=home.example.com bash
 #
 # Token-authenticated custom URL? Pass the token through the environment:
 #   GITHUB_TOKEN=github_pat_xxx sudo -E bash install-from-zip.sh
@@ -20,14 +23,20 @@ ZIP_URL="${HOMELINE_ZIP_URL:-https://github.com/sidestreetmedia/homeline/release
 CHECKSUM_URL="${HOMELINE_CHECKSUM_URL:-${ZIP_URL}.sha256}"
 SKIP_CHECKSUM="${HOMELINE_SKIP_CHECKSUM:-0}"
 INSTALL_DIR="${HOMELINE_DIR:-/opt/homeline}"
-HTTP_PORT="${HOMELINE_PORT:-8080}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+DOMAIN_OVERRIDE="${HOMELINE_DOMAIN:-}"
+SITE_ADDRESS_OVERRIDE="${HOMELINE_SITE_ADDRESS:-$DOMAIN_OVERRIDE}"
 
 log()  { printf '\033[1;36m[homeline]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[homeline]\033[0m %s\n' "$*"; }
 die()  { printf '\033[1;31m[homeline]\033[0m %s\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || die "Please run as root (use sudo)."
+
+if [ -n "$SITE_ADDRESS_OVERRIDE" ] && [ "$SITE_ADDRESS_OVERRIDE" != ":80" ]; then
+  [[ "$SITE_ADDRESS_OVERRIDE" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] \
+    || die "HOMELINE_DOMAIN must be a bare hostname such as home.example.com (no scheme, port, or path)."
+fi
 
 if [ -r /etc/os-release ]; then . /etc/os-release; fi
 [ "${ID:-}" = "ubuntu" ] || warn "Targets Ubuntu; detected '${ID:-unknown}'. Continuing."
@@ -162,44 +171,78 @@ get_or_set() {  # name  generator-cmd  -> appends to .env if absent
   fi
 }
 
+set_env() {  # name value -> replace or append one deployment setting
+  local name="$1" value="$2"
+  if grep -qE "^${name}=" "$ENV_FILE"; then
+    sed -i "s|^${name}=.*|${name}=${value}|" "$ENV_FILE"
+  else
+    printf '%s=%s\n' "$name" "$value" >> "$ENV_FILE"
+  fi
+}
+
 log "Preparing environment file ($ENV_FILE)..."
 get_or_set DB_PASS 'openssl rand -hex 24'
 get_or_set DB_ROOT_PASS 'openssl rand -hex 24'
 get_or_set CONFIG_ENCRYPTION_KEY 'openssl rand -base64 32'
 grep -qE '^AUTO_MIGRATE=' "$ENV_FILE" || echo 'AUTO_MIGRATE=1' >> "$ENV_FILE"
 grep -qE '^SEED_GOD='     "$ENV_FILE" || echo 'SEED_GOD=1'     >> "$ENV_FILE"
-log "Existing MySQL volume and God-mode API keys will be reused."
+if [ -n "$SITE_ADDRESS_OVERRIDE" ]; then
+  set_env HOMELINE_SITE_ADDRESS "$SITE_ADDRESS_OVERRIDE"
+elif ! grep -qE '^HOMELINE_SITE_ADDRESS=.+$' "$ENV_FILE"; then
+  set_env HOMELINE_SITE_ADDRESS ':80'
+fi
+SITE_ADDRESS="$(grep -E '^HOMELINE_SITE_ADDRESS=' "$ENV_FILE" | tail -n1 | cut -d= -f2-)"
+if [ "$SITE_ADDRESS" != ":80" ] && ! grep -qE '^APP_BASE_URL=.+$' "$ENV_FILE"; then
+  set_env APP_BASE_URL "https://${SITE_ADDRESS}"
+fi
+if [ "$SITE_ADDRESS" = ":80" ]; then
+  grep -qE '^DISABLE_SSL=.+$' "$ENV_FILE" || set_env DISABLE_SSL '1'
+elif [ -n "$SITE_ADDRESS_OVERRIDE" ]; then
+  set_env DISABLE_SSL '0'
+else
+  grep -qE '^DISABLE_SSL=.+$' "$ENV_FILE" || set_env DISABLE_SSL '0'
+fi
+log "Existing database volume, credentials, and saved application settings will be reused."
 
 # ---- 6. Build & start -------------------------------------------------------
 log "Building and starting containers (first run can take a few minutes)..."
 $COMPOSE --env-file "$ENV_FILE" up -d --build
 
 # ---- 7. Health check --------------------------------------------------------
-log "Waiting for the app on port ${HTTP_PORT}..."
+log "Waiting for the app to respond..."
 ok=0
 for _ in $(seq 1 60); do
-  code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${HTTP_PORT}/" || true)"
-  if [ "$code" = "200" ] || [ "$code" = "302" ]; then ok=1; break; fi
+  if $COMPOSE exec -T app php -r \
+    'exit(@file_get_contents("http://127.0.0.1/") === false ? 1 : 0);' >/dev/null 2>&1; then
+    ok=1; break
+  fi
   sleep 3
 done
 
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+if [ "$SITE_ADDRESS" = ":80" ]; then
+  PUBLIC_URL="http://${IP:-<server-ip>}/"
+  TLS_NOTE="Add a DNS hostname later and rerun with HOMELINE_DOMAIN to enable HTTPS."
+else
+  PUBLIC_URL="https://${SITE_ADDRESS}/"
+  TLS_NOTE="DNS must point to this server, with inbound TCP 80 and TCP 443 open."
+fi
 echo
 [ "$ok" = "1" ] && log "HomeLine is up." || warn "App not responding yet — check: $COMPOSE logs -f app"
 cat <<MSG
 
   ──────────────────────────────────────────────────────────────
    Installed in: $INSTALL_DIR
-   Local URL:    http://127.0.0.1:${HTTP_PORT}/
-   LAN URL:      http://${IP:-<server-ip>}:${HTTP_PORT}/
+   Public URL:   $PUBLIC_URL
+   God Mode:     ${PUBLIC_URL%/}/admin/
 
    God login:    joshuakuhn
    Password:     reset it now (the package omits the plaintext file):
                  $COMPOSE exec app php cron/make_god.php joshuakuhn --name="Joshua Kuhn"
 
-   Next: put it behind HTTPS, set APP_BASE_URL and your API keys in
-   God-mode -> App keys & config. Back up $ENV_FILE (it holds your
-   CONFIG_ENCRYPTION_KEY).
+   $TLS_NOTE
+   Complete phone, narration, billing, and storage settings in
+   God Mode -> App keys & config. Back up $ENV_FILE.
   ──────────────────────────────────────────────────────────────
 
 MSG

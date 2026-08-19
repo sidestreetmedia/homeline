@@ -34,4 +34,7 @@ DB::run(
 try { Billing::syncQuantity($me); }
 catch (Throwable $e) { error_log('syncQuantity on delete: ' . $e->getMessage()); }
 
+try { Notifications::homeDeleted($me, $listing); }
+catch (Throwable $e) { error_log('Home-deleted notification queue failed: ' . $e->getMessage()); }
+
 header('Location: /dashboard.php?ok=' . rawurlencode('Home deleted and number released. You are billed through this month.'));

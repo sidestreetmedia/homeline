@@ -11,21 +11,28 @@ as a Docker container for easy deployment on a dedicated server.
 
 ## Install directly from GitHub
 
-On a fresh Ubuntu 24.04 server, run:
+On a fresh Ubuntu 24.04 server with a DNS name pointed at it, run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/install-from-zip.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/install-from-zip.sh \
+  | sudo env HOMELINE_DOMAIN=home.example.com bash
 ```
 
 No Git checkout is required. The bootstrap script installs Docker when needed,
 downloads the stable `installer-latest` package from GitHub Releases, verifies
-its SHA-256 checksum, generates the local secrets, and starts HomeLine. Every
+its SHA-256 checksum, generates the local secrets, and starts HomeLine on ports
+80 and 443. HTTPS certificates and HTTP-to-HTTPS redirects are automatic. Every
 push to `main` automatically rebuilds and republishes that release package.
+
+Before installing, point the hostname's DNS record at the server and allow
+inbound TCP ports 80 and 443 in the host firewall. If you only have the server's
+IP address, omit `HOMELINE_DOMAIN`; HomeLine will serve plain HTTP on port 80
+until a hostname is configured.
 
 Re-running the installer is upgrade-safe: it explicitly backs up and restores
 the existing `.env`, reuses the Docker `db_data` volume, and only applies
-additive/idempotent SQL. God-mode values stored in `app_config`—including
-Telnyx, ElevenLabs, Stripe, AWS, and `APP_BASE_URL`—are not seeded or replaced.
+additive/idempotent SQL. God Mode values stored in `app_config`, along with the
+existing database and environment secrets, are not seeded or replaced.
 The existing God password is also left unchanged. Re-run with the same
 `HOMELINE_DIR` so Docker resolves the same Compose project and named volume.
 
@@ -38,7 +45,7 @@ Optional overrides can be passed through the environment:
 
 ```bash
 HOMELINE_DIR=/opt/homeline \
-HOMELINE_PORT=8080 \
+HOMELINE_DOMAIN=home.example.com \
   sudo -E bash -c "$(curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/install-from-zip.sh)"
 ```
 
@@ -60,6 +67,9 @@ HOMELINE_PORT=8080 \
   2. **Uploaded recording** — the agent uploads their own MP3 instead.
 - **One default voice** for all generated narration (configurable).
 - **Listings grouped and sorted by address** under each agent.
+- **Email notifications** when a home is published or deleted, including its
+  phone number and billing impact, and when a caller requests details, including
+  the caller's telephone number.
 - **Stripe billing** at **$5/month per home** (details below).
 - **Card on file required**: agents must save a credit card (via Stripe Checkout)
   before they can publish a home. The same saved card is charged automatically for
@@ -257,6 +267,8 @@ fixed by the `Dockerfile`.
   dashboard and copy its `price_…` ID), and a webhook signing secret.
 - **AWS** — an IAM key/secret with `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`
   on your audio bucket, and the bucket name + region.
+- **AWS SES** — a verified sender address plus credentials with `ses:SendEmail`.
+  Accounts still in the SES sandbox can only notify verified recipient addresses.
 - A **public HTTPS URL** for the app (Telnyx and Stripe must reach the webhooks).
 
 ---
@@ -314,13 +326,12 @@ Environment overrides (optional):
 HOMELINE_REPO=https://github.com/sidestreetmedia/homeline.git \
 HOMELINE_BRANCH=main \
 HOMELINE_DIR=/opt/homeline \
-HOMELINE_PORT=8080 \
+HOMELINE_DOMAIN=home.example.com \
   sudo -E bash -c "$(curl -fsSL https://raw.githubusercontent.com/sidestreetmedia/homeline/main/scripts/install.sh)"
 ```
 
-After it finishes, put the app behind HTTPS and enter your API keys in the
-God-mode portal (see below). The manual steps follow if you'd rather do it
-yourself.
+After it finishes, enter the required application settings in the God Mode
+portal (see below). The manual steps follow if you'd rather do it yourself.
 
 ### Manual install
 
@@ -374,9 +385,9 @@ docker --version && docker compose version
    openssl rand -base64 32        # paste into CONFIG_ENCRYPTION_KEY in .env
    ```
 
-   That's all `.env` needs — the API keys themselves (Telnyx, ElevenLabs, Stripe,
-   AWS, `APP_BASE_URL`) are entered later in the God-mode portal, where they're
-   stored encrypted.
+   Set `HOMELINE_SITE_ADDRESS` to a bare hostname for automatic HTTPS, or leave
+   it as `:80` for IP-only HTTP. Application settings are entered later in the
+   God Mode portal, where sensitive values are stored encrypted.
 
 3. **Build and start:**
 
@@ -387,7 +398,8 @@ docker --version && docker compose version
    On first boot the container waits for MySQL, applies `sql/schema.sql`, and (if
    `SEED_GOD=1`, the default) seeds the God-mode account.
 
-4. **Open the app** at `http://localhost:8080` (or your mapped domain).
+4. **Open the app** at `https://YOUR_DOMAIN/`, or at `http://SERVER_IP/` when
+   running in IP-only mode.
 
 5. **Sign in to God mode** with the seeded credentials (see below), go to
    **God Mode → App keys & config**, and enter all your API keys there
@@ -436,13 +448,13 @@ dump on its own reveals nothing — an attacker would also need the env key.
   This key is the one secret that must stay in the environment alongside the DB
   credentials.
 
-### Putting it behind HTTPS
+### Ports and HTTPS
 
-Apache in the container listens on port 80 (mapped to 8080). In production, put it
-behind a TLS terminator — e.g. a Cloudflare Tunnel, an nginx/Caddy reverse proxy,
-or a load balancer — and set `APP_BASE_URL` to the public `https://…` address.
-If TLS is terminated upstream, set `DISABLE_SSL=1` so session cookies aren't
-marked Secure-only behind the proxy.
+The application container is private to the Compose network. The included web
+gateway publishes host ports 80 and 443; the database is not published on a host
+port. With a bare DNS hostname in `HOMELINE_SITE_ADDRESS`, certificates and
+HTTP-to-HTTPS redirects are automatic. Point DNS at the server and allow inbound
+TCP 80 and 443. Keep `DISABLE_SSL=0` (the default) when using HTTPS.
 
 ### Webhook URLs to configure
 
@@ -561,6 +573,7 @@ The God portal lives at `/admin/`. A God account is a normal agent row with
 
 - See platform stats (agents, active homes, MRR, calls, press-1 texts).
 - Suspend / reactivate agents (suspended agents can't log in).
+- Reset any agent or God account password and revoke that agent's other sessions.
 - Edit all API keys and app configuration (`/admin/config.php`). Secret fields are
   masked; leave the dots in place to keep the current value.
 
@@ -575,6 +588,9 @@ docker compose exec app php cron/make_god.php somelogin --password="..." --name=
 
 It prints the login and password. If the login already exists, it's promoted to
 God mode and its password reset.
+
+You can also reset a password in the browser: open **God Mode**, find the account,
+and select **Reset password**. Passwords must be at least 12 characters.
 
 ---
 

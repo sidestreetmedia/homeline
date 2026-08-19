@@ -10,10 +10,14 @@ final class Auth
         }
         // DB-backed sessions so the app scales across FPM workers/containers.
         session_set_save_handler(new DbSessionHandler(), true);
+        $forwardedProto = strtolower(trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
+        $requestIsHttps = ((!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+            || $forwardedProto === 'https'
+            || (string) ($_SERVER['SERVER_PORT'] ?? '') === '443');
         session_set_cookie_params([
             'lifetime' => 0,
             'path'     => '/',
-            'secure'   => (Config::get('DISABLE_SSL', '0') !== '1'),
+            'secure'   => (Config::get('DISABLE_SSL', '0') !== '1') && $requestIsHttps,
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
@@ -108,10 +112,19 @@ final class Auth
     public static function checkCsrf(?string $token): void
     {
         self::start();
-        if (!$token || empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $token)) {
+        if (!self::csrfIsValid($token)) {
             http_response_code(419);
             echo 'CSRF token mismatch.';
             exit;
         }
+    }
+
+    public static function csrfIsValid(?string $token): bool
+    {
+        self::start();
+        return $token !== null
+            && $token !== ''
+            && !empty($_SESSION['csrf'])
+            && hash_equals((string) $_SESSION['csrf'], $token);
     }
 }
