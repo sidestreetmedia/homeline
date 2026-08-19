@@ -1,16 +1,20 @@
 # HomeLine — LAMP-style image (Apache + PHP) with a baked-in cron worker.
-FROM php:8.2-apache
+# Pin the Debian suite so a floating PHP tag cannot silently change package
+# availability underneath production installs.
+FROM php:8.2-apache-bookworm
 
 # System deps + PHP extensions.
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
         cron \
         unzip \
         libzip-dev \
-        libonig-dev \
+        libxml2-dev \
         default-mysql-client \
-    && docker-php-ext-install pdo_mysql mysqli zip \
-    && docker-php-ext-install simplexml \
-    && rm -rf /var/lib/apt/lists/*
+    ; \
+    docker-php-ext-install -j"$(nproc)" pdo_mysql mysqli zip simplexml; \
+    rm -rf /var/lib/apt/lists/*
 
 # Apache: enable rewrite + headers, point docroot at /public.
 RUN a2enmod rewrite headers

@@ -22,6 +22,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Build application image
+        run: docker build --pull --tag homeline:test .
+
       - name: Build and verify package
         run: |
           bash scripts/build-installzip.sh

@@ -29,6 +29,11 @@ Telnyx, ElevenLabs, Stripe, AWS, and `APP_BASE_URL`—are not seeded or replaced
 The existing God password is also left unchanged. Re-run with the same
 `HOMELINE_DIR` so Docker resolves the same Compose project and named volume.
 
+The release workflow also builds the complete application container before it
+publishes an installer. The image is pinned to the PHP 8.2 Apache Bookworm line
+and installs the XML development headers required to compile SimpleXML, avoiding
+host-dependent failures from a floating Debian base image.
+
 Optional overrides can be passed through the environment:
 
 ```bash
