@@ -4,7 +4,8 @@
 $isNew = empty($listing);
 $smsMax = 280;
 ?>
-<div class="card glass" style="max-width:680px;margin:0 auto">
+<div class="card narrow">
+    <p class="eyebrow"><?= $isNew ? 'New listing' : 'Listing details' ?></p>
     <h2><?= $isNew ? 'Add a home' : 'Edit home' ?></h2>
     <p class="sub">
         <?php if ($isNew): ?>
@@ -33,7 +34,7 @@ $smsMax = 280;
                 <input class="input" name="postal_code" required value="<?= e($listing['postal_code'] ?? '') ?>"></div>
         </div>
 
-        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:22px 0">
+        <hr class="form-rule">
 
         <div class="field">
             <label>Audio source</label>
@@ -57,7 +58,7 @@ $smsMax = 280;
             <?php endif; ?>
         </div>
 
-        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:22px 0">
+        <hr class="form-rule">
 
         <div class="field">
             <label>Press-1 text message (sent to callers)</label>
@@ -84,7 +85,7 @@ $smsMax = 280;
 </div>
 
 <?php if (!$isNew): ?>
-<div class="card glass" style="max-width:680px;margin:22px auto 0">
+<div class="card narrow">
     <h2 style="font-size:18px">Upload a recording</h2>
     <p class="sub">Optional — use your own MP3 instead of generated narration.</p>
     <form method="post" action="/audio_upload.php" enctype="multipart/form-data">

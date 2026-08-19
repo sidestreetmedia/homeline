@@ -8,9 +8,9 @@ $listing = DB::one("SELECT * FROM listings WHERE id=:i AND agent_id=:a AND delet
     [':i' => $id, ':a' => $me['id']]);
 if (!$listing) { header('Location: /dashboard.php'); exit; }
 
-// Release the Twilio number immediately (per spec: released on delete).
-if (!empty($listing['twilio_number_sid'])) {
-    try { Telephony::release($listing['twilio_number_sid']); }
+// Release the Telnyx number immediately (per spec: released on delete).
+if (!empty($listing['phone_number'])) {
+    try { Telephony::release($listing['telnyx_number_id'] ?: null, $listing['phone_number']); }
     catch (Throwable $e) { error_log('Number release failed: ' . $e->getMessage()); }
 }
 
@@ -26,7 +26,7 @@ if (!empty($listing['audio_s3_key'])) {
 DB::run(
     "UPDATE listings
        SET deleted_at = NOW(), billing_state = 'ended',
-           twilio_number = NULL, twilio_number_sid = NULL
+           phone_number = NULL, telnyx_number_id = NULL, telnyx_order_id = NULL
      WHERE id = :id",
     [':id' => $id]
 );

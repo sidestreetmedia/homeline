@@ -9,8 +9,8 @@
     <div class="stat glass"><div class="n"><?= e(date('M j')) ?></div><div class="l">Next bill: 1st</div></div>
 </div>
 
-<div class="card glass">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:20px">
+<div class="card">
+    <div class="section-head">
         <div>
             <h2 style="margin:0">Your listings</h2>
             <p class="sub" style="margin:4px 0 0">Sorted by address. Each home has its own phone number.</p>
@@ -36,13 +36,13 @@
                     <div class="addr"><?= e($l['address_line1']) ?><?= $l['address_line2'] ? ', ' . e($l['address_line2']) : '' ?></div>
                     <div class="meta">
                         <span><?= e($l['city']) ?>, <?= e($l['state']) ?> <?= e($l['postal_code']) ?></span>
-                        <?php if ($l['twilio_number']): ?>
-                            <span class="pill num"><?= e($l['twilio_number']) ?></span>
+                        <?php if ($l['phone_number']): ?>
+                            <span class="pill num"><?= e($l['phone_number']) ?></span>
                         <?php endif; ?>
                         <span class="pill <?= e($l['audio_status']) ?>"><?= e(ucfirst($l['audio_status'])) ?> audio</span>
                     </div>
                 </div>
-                <div style="display:flex;gap:8px">
+                <div class="listing-actions">
                     <a class="btn btn-sm btn-ghost" href="/listing_edit.php?id=<?= (int)$l['id'] ?>">Edit</a>
                     <form method="post" action="/listing_delete.php" onsubmit="return confirm('Delete this home? The phone number will be released. You are still billed for the current month.');">
                         <input type="hidden" name="csrf" value="<?= e(Auth::csrfToken()) ?>">

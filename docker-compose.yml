@@ -17,7 +17,7 @@ services:
       # Generate with: openssl rand -base64 32   (or php cron/gen_key.php)
       # If unset, config values are stored as plaintext (a warning is shown).
       CONFIG_ENCRYPTION_KEY: ${CONFIG_ENCRYPTION_KEY:-}
-      # --- Application keys (Twilio / ElevenLabs / Stripe / AWS / APP_BASE_URL) ---
+      # --- Application keys (Telnyx / ElevenLabs / Stripe / AWS / APP_BASE_URL) ---
       # These are managed in the God-mode portal (App keys & config) and stored in
       # the database. Configure them there after first sign-in. They are NOT set
       # here. (For an automated first boot you may optionally export them in the

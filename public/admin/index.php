@@ -26,13 +26,13 @@ ob_start();
     <div class="stat glass"><div class="n"><?= (int)$totals['texts'] ?></div><div class="l">Press-1 texts</div></div>
 </div>
 
-<div class="card glass">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+<div class="card">
+    <div class="section-head">
         <h2 style="margin:0">Agents</h2>
         <a class="btn btn-sm" href="/admin/config.php">App keys &amp; config</a>
     </div>
     <?php if (!empty($_GET['ok'])): ?><div class="flash ok"><?= e($_GET['ok']) ?></div><?php endif; ?>
-    <table class="tbl">
+    <div class="table-wrap"><table class="tbl">
         <thead><tr><th>Agent</th><th>Email</th><th>Homes</th><th>Status</th><th>Stripe</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($agents as $a): ?>
@@ -63,10 +63,9 @@ ob_start();
             </tr>
         <?php endforeach; ?>
         </tbody>
-    </table>
+    </table></div>
 </div>
 <?php
 $content = ob_get_clean();
 $title = 'God Mode — HomeLine';
 require __DIR__ . '/../../views/layout.php';
-

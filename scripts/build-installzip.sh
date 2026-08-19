@@ -18,7 +18,10 @@ zip -rq "$OUT" . \
   -x '.git/*' \
   -x 'vendor/*' \
   -x '_zips/*' \
+  -x 'scripts/installzip.zip' \
   -x '.env' \
+  -x '.DS_Store' \
+  -x '*/.DS_Store' \
   -x 'INITIAL_GOD_PASSWORD.txt' \
   -x '*.log'
 

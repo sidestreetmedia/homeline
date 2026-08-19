@@ -17,6 +17,8 @@ fi
 if [ "$AUTO_MIGRATE" = "1" ]; then
   echo "Applying schema..."
   mysql -h"$DB_HOST" -P"${DB_PORT:-3306}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" < /var/www/html/sql/schema.sql || true
+  echo "Applying Telnyx migration..."
+  mysql -h"$DB_HOST" -P"${DB_PORT:-3306}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" < /var/www/html/sql/migrate_telnyx.sql
   if [ "$SEED_GOD" = "1" ]; then
     echo "Seeding God account..."
     mysql -h"$DB_HOST" -P"${DB_PORT:-3306}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" < /var/www/html/sql/seed_god.sql || true

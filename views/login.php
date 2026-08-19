@@ -1,4 +1,5 @@
-<div class="card glass" style="max-width:420px;margin:30px auto">
+<div class="card auth-card">
+    <p class="eyebrow">Agent access</p>
     <h2>Welcome back</h2>
     <p class="sub">Sign in to manage your listings.</p>
     <?php if (!empty($error)): ?><div class="flash err"><?= e($error) ?></div><?php endif; ?>

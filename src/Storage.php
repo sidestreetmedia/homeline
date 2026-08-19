@@ -48,7 +48,7 @@ final class Storage
         ]);
     }
 
-    /** Presigned GET URL Twilio can fetch during a call. */
+    /** Presigned GET URL Telnyx can fetch during a call. */
     public static function presignedUrl(string $key, string $ttl = '+20 minutes'): string
     {
         $cmd = self::client()->getCommand('GetObject', [

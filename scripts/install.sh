@@ -142,7 +142,7 @@ cat <<MSG
    NEXT STEPS
      1. Put this behind HTTPS (reverse proxy or Cloudflare Tunnel) and
         set APP_BASE_URL in God-mode → App keys & config.
-     2. Enter your Twilio / ElevenLabs / Stripe / AWS keys in the portal.
+     2. Enter your Telnyx / ElevenLabs / Stripe / AWS keys in the portal.
         (They're stored encrypted with the key in $ENV_FILE — back that up.)
 
    Manage:   cd $INSTALL_DIR && $COMPOSE ps | logs -f | down

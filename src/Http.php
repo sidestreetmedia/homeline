@@ -2,9 +2,8 @@
 declare(strict_types=1);
 
 /**
- * Http — thin cURL wrapper. We use the official SDKs (Stripe/Twilio/AWS) via
- * Composer for the heavy lifting, but ElevenLabs has no first-party PHP SDK,
- * so its calls go through here.
+ * Http — thin cURL wrapper. Telnyx and ElevenLabs REST calls go through here;
+ * Stripe and AWS use their official Composer SDKs.
  */
 final class Http
 {

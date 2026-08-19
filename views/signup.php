@@ -1,4 +1,5 @@
-<div class="card glass" style="max-width:480px;margin:30px auto">
+<div class="card auth-card">
+    <p class="eyebrow">Start with one home</p>
     <h2>Create your account</h2>
     <p class="sub">Add your payment method next. You're only billed $5 when you publish a home.</p>
     <?php if (!empty($error)): ?><div class="flash err"><?= e($error) ?></div><?php endif; ?>

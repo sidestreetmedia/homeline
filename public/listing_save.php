@@ -83,7 +83,7 @@ try {
     $errBack('We could not set up billing. Please add a payment method and try again.');
 }
 
-$numberSid = null; $purchased = null; $newId = null; $firstChargeId = null;
+$numberId = null; $numberOrderId = null; $purchased = null; $newId = null; $firstChargeId = null;
 
 try {
     $pdo->beginTransaction();
@@ -107,7 +107,8 @@ try {
 
     // Purchase the number and wire webhooks.
     $bought = Telephony::purchase($chosen);
-    $numberSid = $bought['sid'];
+    $numberId = $bought['number_id'];
+    $numberOrderId = $bought['order_id'];
     $purchased = $bought['phone'];
 
     // Grace rule: if the home is added within 4 days of the 1st of next month,
@@ -129,11 +130,11 @@ try {
 
     DB::run(
         "UPDATE listings
-           SET twilio_number=:n, twilio_number_sid=:sid, first_charge_id=:fc,
+           SET phone_number=:n, telnyx_number_id=:nid, telnyx_order_id=:oid, first_charge_id=:fc,
                active_until=:au, skip_next_recurring=:skip
          WHERE id=:id",
         [
-            ':n'=>$purchased, ':sid'=>$numberSid, ':fc'=>$firstChargeId,
+            ':n'=>$purchased, ':nid'=>$numberId, ':oid'=>$numberOrderId, ':fc'=>$firstChargeId,
             ':au'=>$activeUntil, ':skip'=>$withinGrace ? 1 : 0, ':id'=>$newId,
         ]
     );
@@ -142,7 +143,7 @@ try {
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) { $pdo->rollBack(); }
     // Best-effort cleanup: release a number if it was bought before failure.
-    if ($numberSid) { try { Telephony::release($numberSid); } catch (Throwable $x) {} }
+    if ($purchased) { try { Telephony::release($numberId, $purchased); } catch (Throwable $x) {} }
     error_log('Listing create failed: ' . $e->getMessage());
     $errBack('Could not complete: ' . $e->getMessage());
 }

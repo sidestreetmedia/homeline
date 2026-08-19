@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS agents (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
--- Listings (one Twilio number per listing)
+-- Listings (one Telnyx number per listing)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS listings (
     id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -50,8 +50,9 @@ CREATE TABLE IF NOT EXISTS listings (
     audio_status        ENUM('pending','ready','failed') NOT NULL DEFAULT 'pending',
 
     -- Telephony
-    twilio_number       VARCHAR(32)     NULL,            -- E.164
-    twilio_number_sid   VARCHAR(64)     NULL,
+    phone_number        VARCHAR(32)     NULL,            -- E.164
+    telnyx_number_id    VARCHAR(64)     NULL,
+    telnyx_order_id     VARCHAR(64)     NULL,
 
     -- Billing lifecycle
     billing_state       ENUM('active','cancel_pending','ended') NOT NULL DEFAULT 'active',
@@ -64,7 +65,7 @@ CREATE TABLE IF NOT EXISTS listings (
 
     PRIMARY KEY (id),
     KEY idx_listings_agent (agent_id),
-    KEY idx_listings_number (twilio_number),
+    KEY idx_listings_number (phone_number),
     KEY idx_listings_addr (agent_id, state, city, address_line1),
     KEY idx_listings_billing (billing_state, active_until),
     CONSTRAINT fk_listings_agent FOREIGN KEY (agent_id)
@@ -77,10 +78,10 @@ CREATE TABLE IF NOT EXISTS listings (
 CREATE TABLE IF NOT EXISTS call_events (
     id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     listing_id      BIGINT UNSIGNED NULL,
-    twilio_number   VARCHAR(32)     NULL,
+    phone_number    VARCHAR(32)     NULL,
     caller_number   VARCHAR(32)     NULL,
     event_type      ENUM('call','press1_sms') NOT NULL DEFAULT 'call',
-    call_sid        VARCHAR(64)     NULL,
+    call_control_id VARCHAR(255)    NULL,
     created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_call_listing (listing_id),

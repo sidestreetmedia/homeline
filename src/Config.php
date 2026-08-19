@@ -8,7 +8,7 @@ declare(strict_types=1);
  *      environment ONLY. They must, because we can't read the database to learn
  *      how to connect to the database. These are set once at deploy time.
  *
- *   2. APPLICATION keys (Twilio, ElevenLabs, Stripe, AWS, APP_BASE_URL, etc.)
+ *   2. APPLICATION keys (Telnyx, ElevenLabs, Stripe, AWS, APP_BASE_URL, etc.)
  *      are managed in the God-mode portal and stored in the `app_config` table.
  *      The portal is the authoritative source. Environment values for these are
  *      treated only as an optional one-time seed/fallback so a fresh deploy can
@@ -23,8 +23,10 @@ final class Config
     public const PORTAL_KEYS = [
         'APP_BASE_URL',
         'DISABLE_SSL',
-        'TWILIO_ACCOUNT_SID',
-        'TWILIO_AUTH_TOKEN',
+        'TELNYX_API_KEY',
+        'TELNYX_TEXML_APP_ID',
+        'TELNYX_MESSAGING_PROFILE_ID',
+        'TELNYX_PUBLIC_KEY',
         'ELEVENLABS_API_KEY',
         'ELEVENLABS_VOICE_ID',
         'ELEVENLABS_MODEL',

@@ -5,9 +5,11 @@ $me = Auth::requireGod();
 // Portal-managed keys, grouped for the UI. These are the authoritative source;
 // the app reads them from the database, not the environment.
 $groups = [
-    'Twilio' => [
-        'TWILIO_ACCOUNT_SID'    => 'Account SID',
-        'TWILIO_AUTH_TOKEN'     => 'Auth Token',
+    'Telnyx' => [
+        'TELNYX_API_KEY'              => 'API key',
+        'TELNYX_TEXML_APP_ID'         => 'TeXML application ID',
+        'TELNYX_MESSAGING_PROFILE_ID' => 'Messaging profile ID',
+        'TELNYX_PUBLIC_KEY'            => 'Webhook public key',
     ],
     'ElevenLabs' => [
         'ELEVENLABS_API_KEY'    => 'API Key',
@@ -66,7 +68,8 @@ $missing = Config::missingPortalKeys();
 
 ob_start();
 ?>
-<div class="card glass" style="max-width:720px;margin:0 auto">
+<div class="card narrow">
+    <p class="eyebrow">System configuration</p>
     <h2>App keys &amp; configuration</h2>
     <p class="sub">These are stored in the database and are the source of truth for
        the whole app. Secrets are masked — leave the dots to keep the current

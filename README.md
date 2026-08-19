@@ -14,7 +14,7 @@ as a Docker container for easy deployment on a dedicated server.
 - **Agent sign-up** with email/password accounts (multi-tenant — each agent only
   sees their own listings).
 - **Per-listing local phone numbers**: an agent searches by area code, picks an
-  available local number, and it's purchased automatically through Twilio. One
+  available local number, and it's purchased automatically through Telnyx. One
   number per listing. The number is **released the moment the listing is deleted**.
 - **Call flow**: caller dials the number → hears the home's audio description →
   is prompted to **press 1** → receives the listing's custom text blurb by SMS.
@@ -31,9 +31,9 @@ as a Docker container for easy deployment on a dedicated server.
   the immediate first-month invoice and for every recurring subscription renewal.
 - **God-mode admin portal** for the operator to manage agents, suspend/reactivate
   accounts, rotate API keys, and view platform-wide stats.
-- **Apple "Liquid Glass" UI** — translucent, blurred glass panels with specular
-  highlights and an atmospheric animated background, following Apple's Human
-  Interface Guidelines aesthetic.
+- **Sidestreet Media 2026 UI** — the current editorial brand system: Outfit and
+  Geist typography, ink/paper surfaces, Sidestreet blue, structural hairlines,
+  and accessible responsive layouts.
 
 ---
 
@@ -93,7 +93,7 @@ includes those homes.
 
 ```
 Browser ── Apache/PHP (public/) ──┬── MySQL 8        (tenants, listings, jobs, sessions, config)
-                                  ├── Twilio API     (number search/purchase/release, voice, SMS)
+                                  ├── Telnyx API     (number search/purchase/release, voice, SMS)
                                   ├── ElevenLabs API (text-to-speech)
                                   ├── Amazon S3      (cached audio)
                                   └── Stripe API     (customers, subscriptions, invoices)
@@ -117,10 +117,11 @@ identically inside the container and on bare shared hosting.
 .
 ├── Dockerfile                 Apache + PHP 8.2 image with baked-in cron
 ├── docker-compose.yml         App + MySQL for one-command local/dev bring-up
-├── composer.json              Stripe, Twilio, AWS SDKs
-├── .env.example               All configuration / secrets
+├── composer.json              Stripe + AWS SDKs (Telnyx uses REST)
+├── .env.example               Infrastructure configuration template
 ├── sql/
 │   ├── schema.sql             Full database schema
+│   ├── migrate_telnyx.sql     Idempotent migration from Twilio-era columns
 │   └── seed_god.sql           Seeds the initial God-mode account
 ├── src/                       Application library (PSR-style autoloaded)
 │   ├── bootstrap.php           Autoload, helpers, view(), enqueue()
@@ -129,11 +130,11 @@ identically inside the container and on bare shared hosting.
 │   ├── Http.php                cURL wrapper (used by ElevenLabs)
 │   ├── Auth.php                Sign-up, login, sessions, CSRF, God gate
 │   ├── DbSessionHandler.php    DB-backed PHP sessions
-│   ├── Telephony.php           Twilio: search / purchase / release / SMS
+│   ├── Telephony.php           Telnyx: search / purchase / release / SMS
 │   ├── ElevenLabs.php          Text-to-speech synthesis
 │   ├── Storage.php             S3 put / delete / presigned URLs
 │   └── Billing.php             Stripe customer/subscription/invoice logic
-├── views/                     HTML templates (Liquid Glass)
+├── views/                     Sidestreet 2026 HTML templates
 ├── public/                    Web document root
 │   ├── index.php login.php signup.php logout.php
 │   ├── dashboard.php
@@ -141,7 +142,7 @@ identically inside the container and on bare shared hosting.
 │   ├── listing_edit.php listing_save.php listing_delete.php
 │   ├── numbers_search.php          (AJAX number search)
 │   ├── audio_upload.php
-│   ├── twilio_voice.php twilio_gather.php twilio_sms.php twilio_status.php
+│   ├── telnyx_voice.php telnyx_gather.php telnyx_messaging.php telnyx_status.php
 │   ├── stripe_webhook.php
 │   └── admin/                      God-mode portal
 │       ├── index.php config.php agent_action.php
@@ -162,12 +163,12 @@ identically inside the container and on bare shared hosting.
 | Web server         | Apache 2.4 (`php:8.2-apache` base image)              |
 | Language           | PHP 8.2                                                |
 | Database           | MySQL 8.0 (PDO)                                        |
-| Telephony          | **Twilio** PHP SDK (`twilio/sdk`)                     |
+| Telephony          | **Telnyx** v2 REST API + TeXML                        |
 | Text-to-speech     | **ElevenLabs** REST API (via cURL)                    |
 | Audio storage      | **Amazon S3** (`aws/aws-sdk-php`)                     |
 | Payments           | **Stripe** PHP SDK (`stripe/stripe-php`)             |
 | Background jobs    | DB-backed queue drained by **cron**                   |
-| UI                 | Hand-written CSS — Apple **Liquid Glass** aesthetic   |
+| UI                 | Hand-written CSS — **Sidestreet Media 2026** system   |
 | Packaging          | **Docker** + Docker Compose                           |
 
 ---
@@ -182,9 +183,9 @@ fixed by the `Dockerfile`.
 
 - Ubuntu 24.04 LTS, 64-bit (also fine on 22.04 LTS)
 - 1 vCPU (2 recommended), 2 GB RAM (4 GB recommended), ~5 GB free disk
-- Outbound HTTPS to Twilio, ElevenLabs, Stripe, and AWS
+- Outbound HTTPS to Telnyx, ElevenLabs, Stripe, and AWS
 - A public DNS name and inbound 80/443 (directly or via a tunnel/reverse proxy),
-  because Twilio and Stripe must reach the webhooks
+  because Telnyx and Stripe must reach the webhooks
 
 **Host software:**
 
@@ -195,8 +196,8 @@ fixed by the `Dockerfile`.
 **What runs inside the container (no need to install on the host):**
 
 - PHP 8.2 (Apache `mod_php`) with extensions `pdo_mysql`, `mysqli`, `curl`,
-  `simplexml`, `zip`, `fileinfo`, `openssl`
-- Composer 2 (build stage only; pulls the Stripe, Twilio, and AWS SDKs)
+  `simplexml`, `zip`, `fileinfo`, `openssl`, `sodium`
+- Composer 2 (build stage only; pulls the Stripe and AWS SDKs)
 - `cron` (runs the background worker every minute)
 
 **External managed dependency:**
@@ -213,14 +214,15 @@ fixed by the `Dockerfile`.
 
 ## External accounts & keys
 
-- **Twilio** — Account SID + Auth Token, with a funded balance / number purchasing
-  enabled. Numbers are bought automatically when an agent picks one.
+- **Telnyx** — API key, TeXML Application ID, Messaging Profile ID, and webhook
+  public key. The funded account must allow number ordering and SMS. US carrier
+  messaging registration requirements still apply.
 - **ElevenLabs** — API key, and a Voice ID for the default narration voice.
 - **Stripe** — Secret key, a **$5/month recurring Price** (create it in the Stripe
   dashboard and copy its `price_…` ID), and a webhook signing secret.
 - **AWS** — an IAM key/secret with `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`
   on your audio bucket, and the bucket name + region.
-- A **public HTTPS URL** for the app (Twilio and Stripe must reach the webhooks).
+- A **public HTTPS URL** for the app (Telnyx and Stripe must reach the webhooks).
 
 ---
 
@@ -336,7 +338,7 @@ docker --version && docker compose version
    openssl rand -base64 32        # paste into CONFIG_ENCRYPTION_KEY in .env
    ```
 
-   That's all `.env` needs — the API keys themselves (Twilio, ElevenLabs, Stripe,
+   That's all `.env` needs — the API keys themselves (Telnyx, ElevenLabs, Stripe,
    AWS, `APP_BASE_URL`) are entered later in the God-mode portal, where they're
    stored encrypted.
 
@@ -353,7 +355,7 @@ docker --version && docker compose version
 
 5. **Sign in to God mode** with the seeded credentials (see below), go to
    **God Mode → App keys & config**, and enter all your API keys there
-   (Twilio, ElevenLabs, Stripe, AWS, and the public `APP_BASE_URL`). **The portal
+   (Telnyx, ElevenLabs, Stripe, AWS, and the public `APP_BASE_URL`). **The portal
    is the source of truth for these** — they're stored in the database, so you
    rotate or change keys here without touching the server or redeploying. The
    page shows which keys are still unset and lets you clear any value.
@@ -366,7 +368,7 @@ There are two tiers of settings:
   `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`) plus `AUTO_MIGRATE` / `SEED_GOD`.
   These *must* be in the environment — the app can't read the database to learn
   how to connect to the database. Set once at deploy time in `.env`.
-- **Application / API keys (God-mode portal):** Twilio, ElevenLabs, Stripe, AWS,
+- **Application / API keys (God-mode portal):** Telnyx, ElevenLabs, Stripe, AWS,
   `APP_BASE_URL`, `DISABLE_SSL`, `PRICE_CENTS`. These are managed at
   `/admin/config.php` and stored in the `app_config` table. A value set in the
   portal always wins. (If a matching environment variable happens to be present
@@ -408,8 +410,26 @@ marked Secure-only behind the proxy.
 
 ### Webhook URLs to configure
 
-The app points Twilio voice/SMS webhooks at itself automatically when it buys a
-number. For Stripe, add a webhook endpoint in the Stripe dashboard pointing to:
+Create a Telnyx **TeXML Application** with these values, then copy its ID into
+`TELNYX_TEXML_APP_ID` in God Mode:
+
+```
+Voice URL:       https://YOUR_DOMAIN/telnyx_voice.php   (POST)
+Status callback: https://YOUR_DOMAIN/telnyx_status.php  (POST)
+```
+
+Create a Telnyx **Messaging Profile**, set its inbound webhook to the URL below,
+and copy its ID into `TELNYX_MESSAGING_PROFILE_ID`:
+
+```
+https://YOUR_DOMAIN/telnyx_messaging.php
+```
+
+Copy the account webhook public key into `TELNYX_PUBLIC_KEY`. HomeLine verifies
+Telnyx Ed25519 signatures and rejects callbacks older than five minutes. New
+numbers are attached to both configured Telnyx resources when ordered.
+
+For Stripe, add a webhook endpoint in the Stripe dashboard pointing to:
 
 ```
 https://YOUR_DOMAIN/stripe_webhook.php
@@ -428,7 +448,7 @@ The app is plain PHP and runs on a standard LAMP stack too. On **Ubuntu 24.04**:
 sudo apt-get update
 sudo apt-get install -y \
   apache2 mysql-server \
-  php php-cli php-mysql php-curl php-xml php-zip php-mbstring libapache2-mod-php \
+  php php-cli php-mysql php-curl php-xml php-zip php-mbstring php-sodium libapache2-mod-php \
   composer git
 
 # Enable the Apache modules the app expects
@@ -459,10 +479,11 @@ Then deploy the app:
    ```
 
    If the host lacks Composer, run it locally and upload the resulting `vendor/`.
-3. Import the schema and seed the God account:
+3. Import the schema, provider migration, and seed the God account:
 
    ```bash
    mysql -u homeline -p homeline < sql/schema.sql
+   mysql -u homeline -p homeline < sql/migrate_telnyx.sql
    mysql -u homeline -p homeline < sql/seed_god.sql
    ```
 4. Provide the **infrastructure** settings (`DB_*`, `CONFIG_ENCRYPTION_KEY`) as
@@ -477,7 +498,7 @@ Then deploy the app:
    SetEnv CONFIG_ENCRYPTION_KEY <openssl rand -base64 32 output>
    ```
 
-   All API keys (Twilio, ElevenLabs, Stripe, AWS, `APP_BASE_URL`) are entered
+   All API keys (Telnyx, ElevenLabs, Stripe, AWS, `APP_BASE_URL`) are entered
    later in the God-mode portal — not here.
 5. Add a **cron job** running the worker every minute (as the web user so file
    permissions match):
@@ -488,10 +509,10 @@ Then deploy the app:
    * * * * * php /var/www/homeline/cron/worker.php >> /var/log/homeline-cron.log 2>&1
    ```
 6. Confirm the PHP extensions `pdo_mysql`, `curl`, `simplexml`, `mbstring`, `zip`,
-   `fileinfo`, and `openssl` are enabled (`php -m`). All ship with Ubuntu's PHP
+   `fileinfo`, `openssl`, and `sodium` are enabled (`php -m`). All ship with Ubuntu's PHP
    packages above.
 7. Put Apache behind HTTPS (e.g. `sudo apt-get install -y certbot
-   python3-certbot-apache && sudo certbot --apache`) so Twilio and Stripe can
+   python3-certbot-apache && sudo certbot --apache`) so Telnyx and Stripe can
    reach the webhooks, and set `APP_BASE_URL` to that `https://…` address in the
    portal.
 
@@ -539,7 +560,7 @@ Password: (delivered separately — see the chat message accompanying this build
 
 ## Operational notes & limitations
 
-- **Twilio costs are real.** Buying a number and sending SMS bills your Twilio
+- **Telnyx costs are real.** Buying a number and sending SMS bills your Telnyx
   account. The app releases numbers on listing deletion to stop ongoing charges.
 - **Card on file is enforced.** Agents are routed to Stripe Checkout at sign-up
   and can't reach the "Add a home" flow until a card is saved. The out-of-band $5

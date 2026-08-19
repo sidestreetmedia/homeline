@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-// Composer autoload (SDKs: Stripe, Twilio, AWS).
+// Composer autoload (SDKs: Stripe and AWS).
 $autoload = __DIR__ . '/../vendor/autoload.php';
 if (is_file($autoload)) {
     require $autoload;
@@ -20,7 +20,7 @@ date_default_timezone_set('UTC');
 /**
  * Friendly handling for unconfigured API keys. If a portal-managed key is
  * missing, agent-facing HTML pages show a clear message instead of a white
- * screen. JSON and Twilio (XML) endpoints set their own content types, so we
+ * screen. JSON and Telnyx (XML) endpoints set their own content types, so we
  * only intervene for plain HTML responses.
  */
 set_exception_handler(function (Throwable $e): void {

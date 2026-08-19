@@ -34,7 +34,8 @@ if ($hasCard) {
 
 ob_start();
 ?>
-<div class="card glass" style="max-width:560px;margin:0 auto">
+<div class="card narrow">
+    <p class="eyebrow">Billing</p>
     <h2>Payment method</h2>
     <p class="sub">A card on file is required before you can publish a home. Your
        card is charged $5 the moment you save a home, and $5 per active home on the
