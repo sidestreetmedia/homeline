@@ -35,9 +35,9 @@ if [ -r /etc/os-release ]; then . /etc/os-release; fi
 export DEBIAN_FRONTEND=noninteractive
 
 # ---- 1. Base packages ------------------------------------------------------
-log "Ensuring curl, unzip, ca-certificates, gnupg are present..."
+log "Ensuring curl, unzip, ca-certificates, gnupg, and openssl are present..."
 apt-get update -y
-apt-get install -y curl unzip ca-certificates gnupg
+apt-get install -y curl unzip ca-certificates gnupg openssl
 
 # ---- 2. Docker (install if missing) ----------------------------------------
 if ! command -v docker >/dev/null 2>&1; then
@@ -121,7 +121,8 @@ mkdir -p "$INSTALL_DIR"
 log "Unpacking into $INSTALL_DIR..."
 # Stage to a temp dir so we can handle zips that contain a top-level folder.
 STAGE="$(mktemp -d)"
-trap 'rm -f "$TMP_ZIP" "$TMP_CHECKSUM"; rm -rf "$STAGE"' EXIT
+PRESERVED_ENV=""
+trap 'rm -f "$TMP_ZIP" "$TMP_CHECKSUM" "${PRESERVED_ENV:-}"; rm -rf "$STAGE"' EXIT
 unzip -q -o "$TMP_ZIP" -d "$STAGE"
 
 # If the zip has a single top-level directory, descend into it.
@@ -132,7 +133,21 @@ if [ "${#entries[@]}" -eq 1 ] && [ -d "${entries[0]}" ]; then
 fi
 [ -f "$SRC/docker-compose.yml" ] || die "Unpacked archive is missing docker-compose.yml (unexpected contents)."
 
+# The official package excludes .env, but preserve it explicitly so an upgrade
+# cannot replace database credentials or the encryption key even if a future or
+# custom package accidentally contains one.
+if [ -e "$INSTALL_DIR/.env" ]; then
+  [ -f "$INSTALL_DIR/.env" ] || die "Existing $INSTALL_DIR/.env is not a regular file; refusing to replace it."
+  PRESERVED_ENV="$(mktemp)"
+  cp -p "$INSTALL_DIR/.env" "$PRESERVED_ENV"
+  log "Preserving existing .env and database-backed application keys."
+fi
+
 cp -a "$SRC"/. "$INSTALL_DIR"/
+
+if [ -n "$PRESERVED_ENV" ]; then
+  cp -p "$PRESERVED_ENV" "$INSTALL_DIR/.env"
+fi
 cd "$INSTALL_DIR"
 
 # ---- 5. Generate .env (idempotent) -----------------------------------------
@@ -153,6 +168,7 @@ get_or_set DB_ROOT_PASS 'openssl rand -hex 24'
 get_or_set CONFIG_ENCRYPTION_KEY 'openssl rand -base64 32'
 grep -qE '^AUTO_MIGRATE=' "$ENV_FILE" || echo 'AUTO_MIGRATE=1' >> "$ENV_FILE"
 grep -qE '^SEED_GOD='     "$ENV_FILE" || echo 'SEED_GOD=1'     >> "$ENV_FILE"
+log "Existing MySQL volume and God-mode API keys will be reused."
 
 # ---- 6. Build & start -------------------------------------------------------
 log "Building and starting containers (first run can take a few minutes)..."

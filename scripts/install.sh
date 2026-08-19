@@ -42,7 +42,7 @@ export DEBIAN_FRONTEND=noninteractive
 if ! command -v docker >/dev/null 2>&1; then
   log "Installing Docker Engine + Compose plugin..."
   apt-get update -y
-  apt-get install -y ca-certificates curl gnupg git
+  apt-get install -y ca-certificates curl gnupg git openssl
   install -m 0755 -d /etc/apt/keyrings
   if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
@@ -58,7 +58,10 @@ https://download.docker.com/linux/ubuntu ${VERSION_CODENAME:-noble} stable" \
   systemctl enable --now docker
 else
   log "Docker already present: $(docker --version)"
-  command -v git >/dev/null 2>&1 || { apt-get update -y && apt-get install -y git; }
+  if ! command -v git >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
+    apt-get update -y
+    apt-get install -y git openssl
+  fi
 fi
 
 # Pick the compose command (plugin preferred).
@@ -107,6 +110,7 @@ get_or_set CONFIG_ENCRYPTION_KEY 'openssl rand -base64 32' >/dev/null
 # First-boot flags (only added if not present).
 grep -qE '^AUTO_MIGRATE=' "$ENV_FILE" || echo 'AUTO_MIGRATE=1' >> "$ENV_FILE"
 grep -qE '^SEED_GOD='     "$ENV_FILE" || echo 'SEED_GOD=1'     >> "$ENV_FILE"
+log "Existing MySQL volume and God-mode API keys will be reused."
 
 # ---- 5. Build & start ------------------------------------------------------
 log "Building and starting containers (this can take a few minutes the first time)..."

@@ -13,14 +13,16 @@ if [ -n "$DB_HOST" ]; then
   done
 fi
 
-# Run schema migration if AUTO_MIGRATE is set.
+# Run additive/idempotent schema migration if AUTO_MIGRATE is set. These files
+# never recreate the database or replace rows in app_config, so portal-managed
+# Telnyx, ElevenLabs, Stripe, AWS, and application settings survive upgrades.
 if [ "$AUTO_MIGRATE" = "1" ]; then
   echo "Applying schema..."
   mysql -h"$DB_HOST" -P"${DB_PORT:-3306}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" < /var/www/html/sql/schema.sql || true
   echo "Applying Telnyx migration..."
   mysql -h"$DB_HOST" -P"${DB_PORT:-3306}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" < /var/www/html/sql/migrate_telnyx.sql
   if [ "$SEED_GOD" = "1" ]; then
-    echo "Seeding God account..."
+    echo "Ensuring the God account exists (existing password is preserved)..."
     mysql -h"$DB_HOST" -P"${DB_PORT:-3306}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" < /var/www/html/sql/seed_god.sql || true
   fi
 fi

@@ -12,6 +12,4 @@ VALUES (
     1
 )
 ON DUPLICATE KEY UPDATE
-    password_hash = VALUES(password_hash),
-    is_god        = 1,
-    status        = 'active';
+    is_god = 1;

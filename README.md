@@ -22,6 +22,13 @@ downloads the stable `installer-latest` package from GitHub Releases, verifies
 its SHA-256 checksum, generates the local secrets, and starts HomeLine. Every
 push to `main` automatically rebuilds and republishes that release package.
 
+Re-running the installer is upgrade-safe: it explicitly backs up and restores
+the existing `.env`, reuses the Docker `db_data` volume, and only applies
+additive/idempotent SQL. God-mode values stored in `app_config`—including
+Telnyx, ElevenLabs, Stripe, AWS, and `APP_BASE_URL`—are not seeded or replaced.
+The existing God password is also left unchanged. Re-run with the same
+`HOMELINE_DIR` so Docker resolves the same Compose project and named volume.
+
 Optional overrides can be passed through the environment:
 
 ```bash

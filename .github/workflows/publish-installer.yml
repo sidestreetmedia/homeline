@@ -26,6 +26,14 @@ jobs:
         run: |
           bash scripts/build-installzip.sh
           unzip -tq _zips/installzip.zip
+          if unzip -Z1 _zips/installzip.zip | grep -Eq '(^|/)(\.env|INITIAL_GOD_PASSWORD\.txt)$|(^|/)(vendor|\.git|_zips)/|^scripts/installzip\.zip$'; then
+            echo "Installer archive contains a forbidden secret, dependency, or nested package path." >&2
+            exit 1
+          fi
+          if grep -q 'password_hash = VALUES(password_hash)' sql/seed_god.sql; then
+            echo "God seed would overwrite an existing password." >&2
+            exit 1
+          fi
           cp _zips/installzip.zip homeline-install.zip
           sha256sum homeline-install.zip > homeline-install.zip.sha256
 
