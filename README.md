@@ -1,5 +1,9 @@
 # HomeLine
 
+> **Now on Cloudflare Workers.** The current app lives in [`worker/`](worker/README.md)
+> (Hono + D1 + KV + Queues) and deploys with `npx wrangler deploy`. Everything
+> below documents the original LAMP/Docker version, kept in this repo as an archive.
+
 **Listings that talk.** A multi-tenant web app that lets real estate agents put a
 phone number on a yard sign. A passerby calls, hears a spoken description of the
 home, and can press **1** to receive the details by text message.

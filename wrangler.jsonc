@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "homeline",
+  "main": "worker/src/index.ts",
+  "compatibility_date": "2025-10-01",
+  "assets": { "directory": "worker/public", "binding": "ASSETS" },
+  "routes": [{ "pattern": "homeline.hellosidestreet.io", "custom_domain": true }],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "homeline-db", "database_id": "5b3ff9c9-ce48-4244-b662-f09f206bc46e" }
+  ],
+  "kv_namespaces": [{ "binding": "SESSIONS", "id": "94296a081dc9487cbcc18cd36038d258" }],
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "homeline-jobs" }],
+    "consumers": [
+      {
+        "queue": "homeline-jobs",
+        "max_batch_size": 5,
+        "max_retries": 5,
+        "retry_delay": 120,
+        "dead_letter_queue": "homeline-jobs-dlq"
+      }
+    ]
+  },
+  // 06:00 UTC on the 1st: after Stripe's renewal, clear grace flags and re-sync quantities.
+  "triggers": { "crons": ["0 6 1 * *"] },
+  "vars": { "APP_BASE_URL": "https://homeline.hellosidestreet.io" },
+  "observability": { "enabled": true }
+}
